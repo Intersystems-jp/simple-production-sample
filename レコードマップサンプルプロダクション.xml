@@ -1,0 +1,622 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25" zv="Cache for Windows (x86-64) 2015.2.2 (Build 805U)" ts="2016-03-30 13:50:43">
+<Project name="EnsExportProduction_2016-03-30 13-50-10_448+9" LastModified="2016-03-30 13:50:43.678686">
+  <ProjectDescription>Studio Project generated from Ensemble Production 'RecordMapSample.Production' at 2016-03-30 04:50:10.448 UTC</ProjectDescription>
+  <Items>
+    <ProjectItem name="RecordMapSample.DBOperation" type="CLS"></ProjectItem>
+    <ProjectItem name="RecordMapSample.Map" type="CLS"></ProjectItem>
+    <ProjectItem name="RecordMapSample.Production" type="CLS"></ProjectItem>
+    <ProjectItem name="RecordMapSample.Request" type="CLS"></ProjectItem>
+    <ProjectItem name="RecordMapSample.Response" type="CLS"></ProjectItem>
+    <ProjectItem name="RecordMapSample.SearchRequest" type="CLS"></ProjectItem>
+    <ProjectItem name="RecordMapSample.Table1" type="CLS"></ProjectItem>
+    <ProjectItem name="EnsExportNotes.EnsExportProduction_2016-03-30 13-50-10_448+9.PTD" type="PTD"></ProjectItem>
+  </Items>
+</Project>
+
+
+<Class name="RecordMapSample.DBOperation">
+<Super>Ens.BusinessOperation</Super>
+<TimeChanged>64007,37336.170296</TimeChanged>
+<TimeCreated>64007,36060.975205</TimeCreated>
+
+<Parameter name="ADAPTER">
+<Default>EnsLib.SQL.OutboundAdapter</Default>
+</Parameter>
+
+<Property name="Adapter">
+<Type>EnsLib.SQL.OutboundAdapter</Type>
+</Property>
+
+<Parameter name="INVOCATION">
+<Default>Queue</Default>
+</Parameter>
+
+<Method name="InsertRequest">
+<FormalSpec>pRequest:RecordMapSample.Request,*pResponse:RecordMapSample.Response</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	#dim ex As %Exception.AbstractException
+	set st=$$$OK
+	try {
+		set pResponse=##class(RecordMapSample.Response).%New()
+		set pResponse.IsError=0
+		set sql="Insert into RecordMapSample.Table1 (SampleID, Code, Tel, CompanyName, DOB) values(?,?,?,?,TODATE(?,'yyyymmdd'))"
+		set st=..Adapter.ExecuteUpdate(.rows,sql,pRequest.SampleID,pRequest.Code,pRequest.Tel,pRequest.CompanyName,pRequest.DOB)
+		$$$THROWONERROR(ex,st)
+	}
+	catch ex {
+		set st=ex.AsStatus()
+		set pResponse.IsError=1
+		set pResponse.Message=$system.Status.GetErrorText(st)
+	}
+	Quit st
+]]></Implementation>
+</Method>
+
+<Method name="SearchRequest">
+<FormalSpec>pRequest:RecordMapSample.SearchRequest,*pResponse:RecordMapSample.Response</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	#dim ex As %Exception.AbstractException
+	set st=$$$OK
+	try {
+		set pResponse=##class(RecordMapSample.Response).%New()
+		set pResponse.IsError=0
+		set sql="select SampleID, Code, Tel, CompanyName, DOB from RecordMapSample.Table1 where ID=?"
+		set st=..Adapter.ExecuteQuery(.rset,sql,pRequest.ID)	
+		$$$THROWONERROR(ex,st)
+		do rset.%Next()
+		set recordmapRequest=##class(RecordMapSample.Request).%New()
+		set recordmapRequest.SampleID=rset.%Get("SampleID")
+		set recordmapRequest.Code=rset.%Get("Code")
+		set recordmapRequest.Tel=rset.%Get("Tel")
+		set recordmapRequest.CompanyName=rset.%Get("CompanyName")
+		set recordmapRequest.DOB=$replace(rset.%Get("DOB"),"-","")  // ODBC形式からyyyymmddに変更
+		
+		// レコードマップ用オペレーションの呼び出し
+		set st=..SendRequestAsync("レコードマップファイル出力",recordmapRequest)
+		$$$THROWONERROR(ex,st)
+	}
+	catch ex {
+		set st=ex.AsStatus()
+		set pResponse.IsError=1
+		set pResponse.Message=$system.Status.GetErrorText(st)
+	}
+	Quit st
+]]></Implementation>
+</Method>
+
+<XData name="MessageMap">
+<Data><![CDATA[
+<MapItems>
+	<MapItem MessageType="RecordMapSample.Request"> 
+		<Method>InsertRequest</Method>
+	</MapItem>
+	<MapItem MessageType="RecordMapSample.SearchRequest"> 
+		<Method>SearchRequest</Method>
+	</MapItem>
+</MapItems>
+]]></Data>
+</XData>
+</Class>
+
+
+<Class name="RecordMapSample.Map">
+<Description>
+RECORDMAP: Modified during compilation of RecordMap 'RecordMapSample.Map'
+on 2016-03-30 at 10:49:59.816 [2016-03-30 01:49:59.816 UTC]
+by user UnknownUser</Description>
+<Super>EnsLib.RecordMap.RecordMap</Super>
+<TimeChanged>64007,38999.817986</TimeChanged>
+<TimeCreated>64007,36766.842518</TimeCreated>
+
+<Method name="GetObject">
+<Description>
+Method to retrieve a record from a stream or device. This method will be generated based on the
+structure of the RecordMap. For testing purposes, a file name may be passed in the pStream argument.</Description>
+<ClassMethod>1</ClassMethod>
+<FormalSpec><![CDATA[pStream:%IO.DeviceStream,*pObject:%RegisteredObject,pTimeout:%Numeric=-1,&pLookAhead:%String="",pLabelFound:%Boolean=0]]></FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	Try {
+		Set tStatus = $$$OK
+		Set pObject = $$$NULLOREF
+		If '$IsObject(pStream) {
+			Set tFilename = pStream
+			Set pStream = ##class(%IO.FileStream).%New()
+			Do pStream.Open(tFilename,,pTimeout,"Shift_JIS", .tStatus)
+			If $$$ISERR(tStatus) Quit
+		}
+		Set tObjectName = $parameter($this,"OBJECTNAME")
+		Set tObject = $classmethod(tObjectName,"%New")
+		If '$IsObject(tObject) {
+			Set tStatus = $$$ERROR($$$CannotCreateObject,tObjectName)
+			Quit
+		}
+		Set tObject.%Source = pStream.Name
+		Set tGetTopFields = $parameter(tObject,"INCLUDETOPFIELDS")
+		If pStream.AtEnd {
+			Set tStatus = $$$ERROR($$$EnsRecordMapErrStreamAtEnd, pStream.Name)
+			Quit
+		}
+		Set pStream.CharEncoding = "Shift_JIS"
+
+		#; Parse incoming stream
+		Set tStatus = ..GetRecord(pStream, tObject, tGetTopFields, pTimeout, .pLookAhead, pLabelFound)
+		If $$$ISERR(tStatus) Quit
+	}
+	Catch ex {
+		Set tStatus = ex.AsStatus()
+	}
+	If $$$ISERR(tStatus) { Set pObject = $$$NULLOREF }
+	Else { Set pObject = tObject }
+	Quit tStatus
+]]></Implementation>
+</Method>
+
+<Method name="PutObject">
+<Description>
+Method to write a record to a stream or device. This method will be generated based on the
+structure of the RecordMap. For testing purposes, a file name may be passed in the pStream argument.</Description>
+<ClassMethod>1</ClassMethod>
+<FormalSpec><![CDATA[pStream:%IO.DeviceStream,pObject:%RegisteredObject,pFlush:%Boolean=1,&pPadArray:%String]]></FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	Try {
+		Set tStatus = $$$OK
+		If '$IsObject(pStream) {
+			Set tFilename = pStream
+			Set pStream = ##class(%IO.FileStream).%New()
+			Do pStream.Open(tFilename,"WAE",,"Shift_JIS", .tStatus)
+			If $$$ISERR(tStatus) Quit
+		}
+		Set tHasTopFields = $parameter(pObject,"INCLUDETOPFIELDS")
+		Set pStream.CharEncoding = "Shift_JIS"
+
+		Set tStatus = ..PutRecord(pStream, pObject, tHasTopFields, .pPadArray)
+		If $$$ISERR(tStatus) Quit
+		If pFlush Do pStream.Flush(.tStatus)
+		If $$$ISERR(tStatus) Quit
+	}
+	Catch ex {
+		Set tStatus = ex.AsStatus()
+	}
+	Quit tStatus
+]]></Implementation>
+</Method>
+
+<Parameter name="OBJECTNAME">
+<Default>RecordMapSample.Request</Default>
+</Parameter>
+
+<Method name="GetRecord">
+<Description>
+Internal helper method to perform parse of incoming data</Description>
+<Internal>1</Internal>
+<ClassMethod>1</ClassMethod>
+<FormalSpec><![CDATA[pStream:%IO.DeviceStream,pObject:%RegisteredObject,pGetTopFields:%Boolean,pTimeout:%Numeric,&pLookAhead:%String="",pLabelFound:%Boolean=0]]></FormalSpec>
+<Private>1</Private>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	Set tStatus = $$$OK
+	If pLabelFound { Set tRecLabel = "" } 
+	Else { Set tRecLabel = "" } 
+	Set tMaxLen = 56 + $length(tRecLabel)
+	Set tStatus = ..chunkRecord(pStream, .tRecordData, .tCharCount, tMaxLen, pTimeout, $char(13,10), tRecLabel, .pLookAhead, .tExtra)
+	If $$$ISERR(tStatus) Quit tStatus
+	Set pLookAhead = $get(tExtra)
+	Set tIgnoreEarlyTerminator = 0
+	If $$$ISERR(tStatus) Quit tStatus
+	Set tMaxLocal = $$$MaxLocalLength
+	Set tRecordData("charcount") = +$get(tCharCount)
+	Set tCurrChunk = 1
+	Set tCurrPos = 1
+	Set tNewChunk = 1
+	Set tCurrVal = ..checkFixedWidthChunk(.tStatus,.tNewChunk,.tCurrChunk,.tRecordData,.tCurrString,.tCurrLen,.tCurrPos,8,"","","SampleID",tIgnoreEarlyTerminator)
+	If $$$ISERR(tStatus) Quit tStatus
+	If pGetTopFields Set pObject.SampleID = pObject.SampleIDDisplayToLogical($ZStrip(tCurrVal, ">", $char(32)))
+	Set tCurrVal = ..checkFixedWidthChunk(.tStatus,.tNewChunk,.tCurrChunk,.tRecordData,.tCurrString,.tCurrLen,.tCurrPos,6,"","","Code",tIgnoreEarlyTerminator)
+	If $$$ISERR(tStatus) Quit tStatus
+	If pGetTopFields Set pObject.Code = pObject.CodeDisplayToLogical($ZStrip(tCurrVal, ">", $char(32)))
+	Set tCurrVal = ..checkFixedWidthChunk(.tStatus,.tNewChunk,.tCurrChunk,.tRecordData,.tCurrString,.tCurrLen,.tCurrPos,14,"","","Tel",tIgnoreEarlyTerminator)
+	If $$$ISERR(tStatus) Quit tStatus
+	If pGetTopFields Set pObject.Tel = pObject.TelDisplayToLogical($ZStrip(tCurrVal, ">", $char(32)))
+	Set tCurrVal = ..checkFixedWidthChunk(.tStatus,.tNewChunk,.tCurrChunk,.tRecordData,.tCurrString,.tCurrLen,.tCurrPos,20,"","","CompanyName",tIgnoreEarlyTerminator)
+	If $$$ISERR(tStatus) Quit tStatus
+	If pGetTopFields Set pObject.CompanyName = pObject.CompanyNameDisplayToLogical($ZStrip(tCurrVal, ">", $char(32)))
+	Set tCurrVal = ..checkFixedWidthChunk(.tStatus,.tNewChunk,.tCurrChunk,.tRecordData,.tCurrString,.tCurrLen,.tCurrPos,8,"","","DOB",tIgnoreEarlyTerminator)
+	If $$$ISERR(tStatus) Quit tStatus
+	If pGetTopFields Set pObject.DOB = pObject.DOBDisplayToLogical($ZStrip(tCurrVal, ">", $char(32)))
+	Quit tStatus
+]]></Implementation>
+</Method>
+
+<Method name="PutRecord">
+<Description>
+Internal helper method to output object to a stream</Description>
+<Internal>1</Internal>
+<ClassMethod>1</ClassMethod>
+<FormalSpec><![CDATA[pStream:%IO.DeviceStream,pObject:%RegisteredObject,pHasTopFields:%Boolean,&pPadArray:%String]]></FormalSpec>
+<Private>1</Private>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	Set tStatus = $$$OK
+	If pHasTopFields { Set tValue = ##class(RecordMapSample.Request).SampleIDLogicalToDisplay(pObject.SampleID), tLen = $length(tValue) }
+	Else { Set tValue = "", tLen = 0}
+	If 8 > tLen {
+		Set tPadding = $get(pPadArray(8 - tLen))
+		If tPadding = "" {
+			Set $piece(tPadding, $char(32), (8 - tLen + 1)) = ""
+			Set pPadArray(8-tLen) = tPadding
+		}
+		Set tValue = tValue_tPadding
+	}
+	Do pStream.Write(tValue, 0, .tStatus)
+	If $$$ISERR(tStatus) Quit tStatus
+	If pHasTopFields { Set tValue = ##class(RecordMapSample.Request).CodeLogicalToDisplay(pObject.Code), tLen = $length(tValue) }
+	Else { Set tValue = "", tLen = 0}
+	If 6 > tLen {
+		Set tPadding = $get(pPadArray(6 - tLen))
+		If tPadding = "" {
+			Set $piece(tPadding, $char(32), (6 - tLen + 1)) = ""
+			Set pPadArray(6-tLen) = tPadding
+		}
+		Set tValue = tValue_tPadding
+	}
+	Do pStream.Write(tValue, 0, .tStatus)
+	If $$$ISERR(tStatus) Quit tStatus
+	If pHasTopFields { Set tValue = ##class(RecordMapSample.Request).TelLogicalToDisplay(pObject.Tel), tLen = $length(tValue) }
+	Else { Set tValue = "", tLen = 0}
+	If 14 > tLen {
+		Set tPadding = $get(pPadArray(14 - tLen))
+		If tPadding = "" {
+			Set $piece(tPadding, $char(32), (14 - tLen + 1)) = ""
+			Set pPadArray(14-tLen) = tPadding
+		}
+		Set tValue = tValue_tPadding
+	}
+	Do pStream.Write(tValue, 0, .tStatus)
+	If $$$ISERR(tStatus) Quit tStatus
+	If pHasTopFields { Set tValue = ##class(RecordMapSample.Request).CompanyNameLogicalToDisplay(pObject.CompanyName), tLen = $length(tValue) }
+	Else { Set tValue = "", tLen = 0}
+	If 20 > tLen {
+		Set tPadding = $get(pPadArray(20 - tLen))
+		If tPadding = "" {
+			Set $piece(tPadding, $char(32), (20 - tLen + 1)) = ""
+			Set pPadArray(20-tLen) = tPadding
+		}
+		Set tValue = tValue_tPadding
+	}
+	Do pStream.Write(tValue, 0, .tStatus)
+	If $$$ISERR(tStatus) Quit tStatus
+	If pHasTopFields { Set tValue = ##class(RecordMapSample.Request).DOBLogicalToDisplay(pObject.DOB), tLen = $length(tValue) }
+	Else { Set tValue = "", tLen = 0}
+	If 8 > tLen {
+		Set tPadding = $get(pPadArray(8 - tLen))
+		If tPadding = "" {
+			Set $piece(tPadding, $char(32), (8 - tLen + 1)) = ""
+			Set pPadArray(8-tLen) = tPadding
+		}
+		Set tValue = tValue_tPadding
+	}
+	Do pStream.Write(tValue, 0, .tStatus)
+	If $$$ISERR(tStatus) Quit tStatus
+	Do pStream.Write($char(13,10), 0, .tStatus)
+	If $$$ISERR(tStatus) Quit tStatus
+	Quit tStatus
+]]></Implementation>
+</Method>
+
+<Method name="GetGeneratedClasses">
+<ClassMethod>1</ClassMethod>
+<FormalSpec>*pClasses:%String</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	Kill pClasses
+	Set pClasses("RecordMapSample.Request")=""
+	Set pClasses($classname())=""
+	Quit $$$OK
+]]></Implementation>
+</Method>
+
+<Method name="getIdentifier">
+<ClassMethod>1</ClassMethod>
+<CodeMode>expression</CodeMode>
+<ReturnType>%String</ReturnType>
+<Implementation><![CDATA[""
+]]></Implementation>
+</Method>
+
+<Method name="getType">
+<ClassMethod>1</ClassMethod>
+<CodeMode>expression</CodeMode>
+<ReturnType>EnsLib.RecordMap.Model.DataType.RecordType</ReturnType>
+<Implementation><![CDATA["fixedwidth"
+]]></Implementation>
+</Method>
+
+<XData name="RecordMap">
+<XMLNamespace>http://www.intersystems.com/Ensemble/RecordMap</XMLNamespace>
+<Data><![CDATA[
+<Record xmlns="http://www.intersystems.com/Ensemble/RecordMap" name="RecordMapSample.Map" type="fixedwidth" char_encoding="Shift_JIS" targetClassname="RecordMapSample.Request" complexBatchManaged="0" paddingChars="\x20" padFromLeft="0" recordTerminator="\x0d\x0a" allowEarlyTerminator="0">
+  <Field name="SampleID" required="0" datatype="%String" width="8" sqlColumn="2" repeating="0">
+  </Field>
+  <Field name="Code" required="0" datatype="%String" width="6" sqlColumn="3" repeating="0">
+  </Field>
+  <Field name="Tel" required="0" datatype="%String" width="14" sqlColumn="4" repeating="0">
+  </Field>
+  <Field name="CompanyName" required="0" datatype="%String" width="20" sqlColumn="5" repeating="0">
+  </Field>
+  <Field name="DOB" required="0" datatype="%String" width="8" sqlColumn="6" repeating="0">
+  </Field>
+</Record>
+]]></Data>
+</XData>
+</Class>
+
+
+<Class name="RecordMapSample.Production">
+<Super>Ens.Production</Super>
+<TimeChanged>64007,49784.306535</TimeChanged>
+<TimeCreated>64007,36506.960973</TimeCreated>
+
+<XData name="ProductionDefinition">
+<Data><![CDATA[
+<Production Name="RecordMapSample.Production" TestingEnabled="true" LogGeneralTraceEvents="false">
+  <Description></Description>
+  <ActorPoolSize>2</ActorPoolSize>
+  <Item Name="レコードマップファイルサービス" Category="" ClassName="EnsLib.RecordMap.Service.FileService" PoolSize="1" Enabled="true" Foreground="false" Comment="" LogTraceEvents="false" Schedule="">
+    <Setting Target="Host" Name="RecordMap">RecordMapSample.Map</Setting>
+    <Setting Target="Adapter" Name="FilePath">C:\temp\in\</Setting>
+    <Setting Target="Adapter" Name="FileSpec">input.txt</Setting>
+    <Setting Target="Host" Name="TargetConfigNames">RecordMapSample.DBOperation</Setting>
+  </Item>
+  <Item Name="レコードマップファイル出力" Category="" ClassName="EnsLib.RecordMap.Operation.FileOperation" PoolSize="1" Enabled="true" Foreground="false" Comment="" LogTraceEvents="false" Schedule="">
+    <Setting Target="Host" Name="Filename">output.txt</Setting>
+    <Setting Target="Host" Name="RecordMap">RecordMapSample.Map</Setting>
+    <Setting Target="Adapter" Name="FilePath">C:\temp\out\</Setting>
+    <Setting Target="Adapter" Name="Charset">Binary</Setting>
+  </Item>
+  <Item Name="RecordMapSample.DBOperation" Category="" ClassName="RecordMapSample.DBOperation" PoolSize="1" Enabled="true" Foreground="false" Comment="" LogTraceEvents="false" Schedule="">
+    <Setting Target="Adapter" Name="DSN">EnsembleTest</Setting>
+  </Item>
+</Production>
+]]></Data>
+</XData>
+</Class>
+
+
+<Class name="RecordMapSample.Request">
+<Description>
+RECORDMAP: Generated from RecordMap 'RecordMapSample.Map'
+on 2016-03-30 at 10:49:59.802 [2016-03-30 01:49:59.802 UTC]
+by user UnknownUser</Description>
+<ProcedureBlock>1</ProcedureBlock>
+<Super>%Persistent,%XML.Adaptor,Ens.Request,EnsLib.RecordMap.Base</Super>
+<TimeChanged>64007,38999.80756</TimeChanged>
+<TimeCreated>64007,38999.802826</TimeCreated>
+<Inheritance>right</Inheritance>
+
+<Parameter name="INCLUDETOPFIELDS">
+<Default>1</Default>
+</Parameter>
+
+<Property name="SampleID">
+<Type>%String</Type>
+<SqlColumnNumber>2</SqlColumnNumber>
+<Parameter name="MAXLEN" value="8"/>
+</Property>
+
+<Property name="Code">
+<Type>%String</Type>
+<SqlColumnNumber>3</SqlColumnNumber>
+<Parameter name="MAXLEN" value="6"/>
+</Property>
+
+<Property name="Tel">
+<Type>%String</Type>
+<SqlColumnNumber>4</SqlColumnNumber>
+<Parameter name="MAXLEN" value="14"/>
+</Property>
+
+<Property name="CompanyName">
+<Type>%String</Type>
+<SqlColumnNumber>5</SqlColumnNumber>
+<Parameter name="MAXLEN" value="20"/>
+</Property>
+
+<Property name="DOB">
+<Type>%String</Type>
+<SqlColumnNumber>6</SqlColumnNumber>
+<Parameter name="MAXLEN" value="8"/>
+</Property>
+
+<Storage name="Default">
+<Type>%Library.CacheStorage</Type>
+<DataLocation>^RecordMapSample.RequestD</DataLocation>
+<DefaultData>RequestDefaultData</DefaultData>
+<IdLocation>^RecordMapSample.RequestD</IdLocation>
+<IndexLocation>^RecordMapSample.RequestI</IndexLocation>
+<StreamLocation>^RecordMapSample.RequestS</StreamLocation>
+<ExtentSize>2000000</ExtentSize>
+<Data name="RequestDefaultData">
+<Value name="1">
+<Value>%%CLASSNAME</Value>
+</Value>
+<Value name="2">
+<Value>SampleID</Value>
+</Value>
+<Value name="3">
+<Value>%Source</Value>
+</Value>
+<Value name="4">
+<Value>Tel</Value>
+</Value>
+<Value name="5">
+<Value>CompanyName</Value>
+</Value>
+<Value name="6">
+<Value>DOB</Value>
+</Value>
+<Value name="7">
+<Value>Code</Value>
+</Value>
+</Data>
+</Storage>
+
+<Parameter name="RECORDMAPGENERATED">
+<Default>1</Default>
+</Parameter>
+</Class>
+
+
+<Class name="RecordMapSample.Response">
+<Super>Ens.Response</Super>
+<TimeChanged>64007,35410.899516</TimeChanged>
+<TimeCreated>64007,35410.749341</TimeCreated>
+
+<Property name="IsError">
+<Type>%Boolean</Type>
+</Property>
+
+<Property name="Message">
+<Type>%String</Type>
+<Parameter name="MAXLEN" value="10000"/>
+</Property>
+
+<Storage name="Default">
+<Type>%Library.CacheStorage</Type>
+<DefaultData>ResponseDefaultData</DefaultData>
+<Data name="ResponseDefaultData">
+<Structure>listnode</Structure>
+<Subscript>"Response"</Subscript>
+<Value name="1">
+<Value>IsError</Value>
+</Value>
+<Value name="2">
+<Value>Message</Value>
+</Value>
+</Data>
+</Storage>
+</Class>
+
+
+<Class name="RecordMapSample.SearchRequest">
+<Super>Ens.Request</Super>
+<TimeChanged>64007,34895.289206</TimeChanged>
+<TimeCreated>64007,34895.124391</TimeCreated>
+
+<Property name="ID">
+<Type>%Integer</Type>
+</Property>
+
+<Storage name="Default">
+<Type>%Library.CacheStorage</Type>
+<DefaultData>SearchRequestDefaultData</DefaultData>
+<Data name="SearchRequestDefaultData">
+<Structure>listnode</Structure>
+<Subscript>"SearchRequest"</Subscript>
+<Value name="1">
+<Value>ID</Value>
+</Value>
+</Data>
+</Storage>
+</Class>
+
+
+<Class name="RecordMapSample.Table1">
+<Super>%Persistent</Super>
+<TimeChanged>64007,35770.577516</TimeChanged>
+<TimeCreated>64007,34819.323577</TimeCreated>
+
+<Property name="SampleID">
+<Type>%String</Type>
+<Required>1</Required>
+<SqlColumnNumber>2</SqlColumnNumber>
+<Parameter name="MAXLEN" value="8"/>
+</Property>
+
+<Property name="Code">
+<Type>%String</Type>
+<SqlColumnNumber>3</SqlColumnNumber>
+<Parameter name="MAXLEN" value="6"/>
+</Property>
+
+<Property name="Tel">
+<Type>%String</Type>
+<SqlColumnNumber>4</SqlColumnNumber>
+<Parameter name="MAXLEN" value="14"/>
+</Property>
+
+<Property name="CompanyName">
+<Type>%String</Type>
+<SqlColumnNumber>5</SqlColumnNumber>
+<Parameter name="MAXLEN" value="20"/>
+</Property>
+
+<Property name="DOB">
+<Description>
+誕生日は内部日付で持たせたほうが便利なので %Date　に変更</Description>
+<Type>%Date</Type>
+<SqlColumnNumber>6</SqlColumnNumber>
+</Property>
+
+<Storage name="Default">
+<Type>%Library.CacheStorage</Type>
+<DataLocation>^RecordMapSample.Table1D</DataLocation>
+<DefaultData>Table1DefaultData</DefaultData>
+<IdLocation>^RecordMapSample.Table1D</IdLocation>
+<IndexLocation>^RecordMapSample.Table1I</IndexLocation>
+<StreamLocation>^RecordMapSample.Table1S</StreamLocation>
+<Data name="Table1DefaultData">
+<Value name="1">
+<Value>%%CLASSNAME</Value>
+</Value>
+<Value name="2">
+<Value>SampleID</Value>
+</Value>
+<Value name="3">
+<Value>Code</Value>
+</Value>
+<Value name="4">
+<Value>Tel</Value>
+</Value>
+<Value name="5">
+<Value>CompanyName</Value>
+</Value>
+<Value name="6">
+<Value>DOB</Value>
+</Value>
+</Data>
+</Storage>
+</Class>
+
+
+<Document name="EnsExportNotes.EnsExportProduction_2016-03-30 13-50-10_448+9.PTD"><ProjectTextDocument name="EnsExportNotes.EnsExportProduction_2016-03-30 13-50-10_448+9" description="Export Notes for export EnsExportProduction_2016-03-30 13-50-10_448+9">
+<![CDATA[<Deployment>
+<Creation>
+<Machine>IIJIMA-LETSNOTE</Machine>
+<Instance>ENSEMBLENEW</Instance>
+<Namespace>ENSEMBLE</Namespace>
+<SourceProduction>RecordMapSample.Production</SourceProduction>
+<Username>UnknownUser</Username>
+<UTC>2016-03-30 04:50:43.704</UTC>
+</Creation>
+<Notes>
+</Notes>
+<Contents>
+<ExportProject>EnsExportProduction_2016-03-30 13-50-10_448+9</ExportProject>
+<Item num="1">RecordMapSample.DBOperation.CLS</Item>
+<Item num="2">RecordMapSample.Map.CLS</Item>
+<Item num="3">RecordMapSample.Production.CLS</Item>
+<Item num="4">RecordMapSample.Request.CLS</Item>
+<Item num="5">RecordMapSample.Response.CLS</Item>
+<Item num="6">RecordMapSample.SearchRequest.CLS</Item>
+<Item num="7">RecordMapSample.Table1.CLS</Item>
+</Contents>
+<ProductionClassInExport>RecordMapSample.Production</ProductionClassInExport>
+</Deployment>
+
+]]></ProjectTextDocument>
+</Document></Export>
